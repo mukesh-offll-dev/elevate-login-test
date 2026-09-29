@@ -176,28 +176,35 @@ pipeline {
             junit testResults: 'artifacts/junit-results.xml',
                   allowEmptyResults: true
 
-            // Archive HTML report, Playwright traces/screenshots and redacted
-            // diagnostics JSON as downloadable build artifacts.
+            // Zip the Playwright HTML report so every build has one
+            // self-contained downloadable artifact.
+            //
+            // Why not publishHTML?
+            //   The HTML Publisher plugin wraps reports in a sandboxed iframe
+            //   that omits allow-scripts, so Playwright's React SPA cannot
+            //   execute and the page renders black.  Relaxing the Jenkins CSP
+            //   globally (unsafe-inline / unsafe-eval) is intentionally avoided.
+            //   The correct interactive viewer is Playwright's own local server:
+            //     1. Download playwright-report.zip from the build artifacts.
+            //     2. Extract it to any local folder.
+            //     3. Run: npx playwright show-report <extracted-folder>
+            //        (or: npm run test:report  if you extracted to ./playwright-report)
+            //   This opens http://localhost:9323 — no CSP restrictions apply.
+            //
+            // The "if exist" guard prevents a bat error when the report folder
+            // was not created (e.g. the Install stage failed before tests ran).
+            bat 'if exist playwright-report powershell -NoProfile -NonInteractive -Command "Compress-Archive -Path playwright-report -DestinationPath playwright-report.zip -Force"'
+
+            // Archive the ZIP, raw report folder, traces/screenshots and
+            // redacted diagnostics JSON.  All artifacts are associated with
+            // the build number by Jenkins automatically.
             archiveArtifacts artifacts: [
+                'playwright-report.zip',
                 'playwright-report/**',
                 'test-results/**',
                 'artifacts/**'
             ].join(','),
             allowEmptyArchive: true
-
-            // Publish the Playwright HTML report as an inline Jenkins page.
-            // Requires the HTML Publisher plugin.
-            // IMPORTANT: Jenkins' default Content Security Policy blocks the
-            // JavaScript inside Playwright's HTML report. Run the one-time
-            // Script Console fix described in the setup documentation.
-            publishHTML(target: [
-                allowMissing         : true,
-                alwaysLinkToLastBuild: true,
-                keepAll              : true,
-                reportDir            : 'playwright-report',
-                reportFiles          : 'index.html',
-                reportName           : 'Playwright Report'
-            ])
         }
 
     }

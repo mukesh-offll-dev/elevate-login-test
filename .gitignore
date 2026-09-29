@@ -1,0 +1,29 @@
+# --- Secrets -----------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Dependencies ------------------------------------------------------
+node_modules/
+
+# --- Playwright output -------------------------------------------------
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.playwright-mcp/
+
+# --- Local artifacts (screenshots, traces, sanitized diagnostics) ------
+# These can capture page state, so they are never committed.
+artifacts/
+!artifacts/.gitkeep
+
+# --- Editor / OS -------------------------------------------------------
+.idea/
+.vscode/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

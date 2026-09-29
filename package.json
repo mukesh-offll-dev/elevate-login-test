@@ -1,0 +1,23 @@
+{
+  "name": "elevate-login-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Playwright TypeScript suite for the Thinkster Elevate parent login and the hellothinkster free-trial signup entry point",
+  "scripts": {
+    "test": "playwright test",
+    "test:login": "playwright test tests/login.spec.ts",
+    "test:signup": "playwright test tests/signup.spec.ts",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report playwright-report",
+    "typecheck": "tsc --noEmit",
+    "inspect": "tsx scripts/inspect-dom.ts",
+    "clean": "node -e \"const fs=require('fs');['playwright-report','test-results','artifacts'].forEach(d=>fs.rmSync(d,{recursive:true,force:true}))\""
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "dotenv": "^16.4.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,7 +1,9 @@
 /**
  * Jenkinsfile — Thinkster sandbox QA / Elevate login test suite
  *
- * Runs tests/login.spec.ts on a Windows Jenkins agent every 30 minutes.
+ * Runs tests/login.spec.ts on a Windows Jenkins agent twice daily at
+ * 09:00 and 21:00 IST (Asia/Kolkata).  The TZ= prefix in the cron
+ * expression pins the schedule to IST regardless of the Jenkins server timezone.
  *
  * ─── JENKINS CREDENTIALS (OPTIONAL) ────────────────────────────────────────
  * Parent credentials are injected when the credential IDs exist in Jenkins.
@@ -40,8 +42,12 @@ pipeline {
     }
 
     triggers {
-        // H spreads load across the half-hour so all jobs don't fire at :00/:30.
-        cron('H/30 * * * *')
+        // Fires at 09:00 and 21:00 IST every day.
+        // TZ=Asia/Kolkata pins the schedule to IST at the cron level, so the
+        // build fires at the correct local time regardless of whether the
+        // Jenkins server is configured in UTC, IST or any other timezone.
+        // Equivalent UTC times: 03:30 and 15:30.
+        cron('TZ=Asia/Kolkata\n0 9,21 * * *')
     }
 
     environment {

@@ -3,18 +3,19 @@
  *
  * Runs tests/login.spec.ts on a Windows Jenkins agent every 30 minutes.
  *
- * ─── JENKINS CREDENTIALS REQUIRED ──────────────────────────────────────────
- * Two credentials must exist in Jenkins (Manage Jenkins → Credentials).
- * Leave the secret blank to skip LOGIN-07 and LOGIN-08 without failing the build.
+ * ─── JENKINS CREDENTIALS (OPTIONAL) ────────────────────────────────────────
+ * Parent credentials are injected when the credential IDs exist in Jenkins.
+ * If either ID is missing the build continues without them: LOGIN-07 and
+ * LOGIN-08 skip automatically via the hasParentCredentials guard in
+ * test-data.ts.  No credential is required for any signup test.
  *
- *  Credential ID               Variable injected           Blank = skip tests?
- *  ──────────────────────────  ──────────────────────────  ───────────────────
- *  elevate-parent-email        ELEVATE_PARENT_EMAIL        Yes → LOGIN-07/08 skip
- *  elevate-parent-password     ELEVATE_PARENT_PASSWORD     Yes → LOGIN-07/08 skip
+ *  Credential ID               Variable injected           Effect when absent
+ *  ──────────────────────────  ──────────────────────────  ──────────────────
+ *  elevate-parent-email        ELEVATE_PARENT_EMAIL        LOGIN-07/08 skip
+ *  elevate-parent-password     ELEVATE_PARENT_PASSWORD     LOGIN-07/08 skip
  *
- * NOTE: optional:true is NOT used here because it requires Credentials Binding
- * Plugin ≥ 1.24.  Instead, both credentials must exist in Jenkins.  An empty
- * string value is functionally identical to "not set" for these tests.
+ * NOTE: optional:true is not used (requires Credentials Binding Plugin ≥ 1.24).
+ * A Groovy try/catch handles missing credential IDs instead.
  *
  * ─── DESTRUCTIVE GATES ──────────────────────────────────────────────────────
  * RUN_LIVE_SIGNUP, RUN_PAYMENT, ALLOW_UNIQUE_EMAIL and SEND_PASSWORD_RESET are
@@ -128,34 +129,39 @@ pipeline {
             }
         }
 
-        stage('Run Login Tests') {
+        stage('Run Tests') {
             steps {
-                // ── Inject secrets from the Jenkins Credential Store ──────────
+                // Runs tests/login.spec.ts (LOGIN-01..10) and
+                // tests/signup.spec.ts (SIGNUP-00..05, non-destructive only).
+                // SIGNUP-06..09 are gated by RUN_LIVE_SIGNUP=false and skip.
+                // SIGNUP-10..12 are test.fixme stubs and never run.
                 //
-                // All credential IDs below MUST exist in Jenkins.
-                // Create them under Manage Jenkins → Credentials even if the
-                // secret value is left blank — an empty string causes the
-                // dependent tests to skip rather than fail.
+                // Parent credentials are injected when their Jenkins credential
+                // IDs exist.  If either ID is missing the build falls through
+                // to the catch branch and runs without them; LOGIN-07 and
+                // LOGIN-08 skip via the hasParentCredentials guard in test-data.ts.
+                // No signup test requires credentials.
                 //
-                // Jenkins automatically masks every bound value in console output.
-                // The diagnostics.ts redact() function provides a second layer of
-                // protection inside Playwright JSON artifacts and traces.
-                //
-                // optional:true is intentionally absent; it requires Credentials
-                // Binding Plugin ≥ 1.24 and produces "Unknown parameter: optional"
-                // on older installations.
-                withCredentials([
-                    // Gates LOGIN-07 and LOGIN-08. Blank value → tests skip.
-                    string(credentialsId: 'elevate-parent-email',
-                           variable: 'ELEVATE_PARENT_EMAIL'),
-                    string(credentialsId: 'elevate-parent-password',
-                           variable: 'ELEVATE_PARENT_PASSWORD')
-                ]) {
-                    // npm run test:login expands to:
-                    //   playwright test tests/login.spec.ts
-                    // Reporters (list + HTML + JUnit) are declared in
-                    // playwright.config.ts and must not be repeated here.
-                    bat 'npm run test:login'
+                // Jenkins masks every bound value in console output.
+                // diagnostics.ts redact() provides a second layer inside artifacts.
+                script {
+                    try {
+                        withCredentials([
+                            string(credentialsId: 'elevate-parent-email',
+                                   variable: 'ELEVATE_PARENT_EMAIL'),
+                            string(credentialsId: 'elevate-parent-password',
+                                   variable: 'ELEVATE_PARENT_PASSWORD')
+                        ]) {
+                            bat 'npm test'
+                        }
+                    } catch (hudson.AbortException ex) {
+                        if (ex.message != null && ex.message.contains('Could not find credentials')) {
+                            echo 'Parent credentials not found in Jenkins — LOGIN-07 and LOGIN-08 will skip automatically.'
+                            bat 'npm test'
+                        } else {
+                            throw ex
+                        }
+                    }
                 }
             }
         }

@@ -121,6 +121,26 @@ export function uniqueEmail(prefix = 'qa.elevate'): string {
 }
 
 /**
+ * Generates a fresh, collision-resistant signup email for every test iteration.
+ *
+ * Format:  test<DD><MM><HH><mm>+<ss><mmm>@<TEST_EMAIL_DOMAIN>
+ * Example: test29091030+12456@tabtortest.com
+ *          (29th day, September, 10:30, second 12, millisecond 456)
+ *
+ * The seconds+milliseconds suffix prevents collisions when multiple tests run
+ * within the same minute. No real parent credentials are involved.
+ * The address passes the assertApprovedEmail guard because it uses TEST_EMAIL_DOMAIN.
+ */
+export function signupEmail(): string {
+  const now = new Date();
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  const p3 = (n: number) => String(n).padStart(3, '0');
+  const base = `test${p2(now.getDate())}${p2(now.getMonth() + 1)}${p2(now.getHours())}${p2(now.getMinutes())}`;
+  const sub  = `${p2(now.getSeconds())}${p3(now.getMilliseconds())}`;
+  return `${base}+${sub}@${TEST_EMAIL_DOMAIN}`;
+}
+
+/**
  * Syntactically valid address on the approved test domain that must never
  * resolve to a real account. Used for the wrong-credentials login test, which
  * only ever hits POST /api/auth/login and never the signup funnel.

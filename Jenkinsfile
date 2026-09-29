@@ -4,31 +4,16 @@
  * Runs tests/login.spec.ts on a Windows Jenkins agent every 30 minutes.
  *
  * ─── JENKINS CREDENTIALS REQUIRED ──────────────────────────────────────────
- * Create every entry below in Manage Jenkins → Credentials → System →
- * Global credentials → Add Credential  (Kind = Secret text for all).
+ * Two credentials must exist in Jenkins (Manage Jenkins → Credentials).
+ * Leave the secret blank to skip LOGIN-07 and LOGIN-08 without failing the build.
  *
- * Every credential ID listed here MUST exist in Jenkins before the first run,
- * even if its value is left blank. A missing credential ID causes a build
- * failure before any test runs.  Blank values are safe: the existing guards in
- * test-data.ts (hasParentCredentials, hasTestCard) evaluate to false and the
- * matching tests skip automatically.
- *
- *  Credential ID               Variable(s) injected        Safe to leave blank?
- *  ──────────────────────────  ──────────────────────────  ────────────────────
+ *  Credential ID               Variable injected           Blank = skip tests?
+ *  ──────────────────────────  ──────────────────────────  ───────────────────
  *  elevate-parent-email        ELEVATE_PARENT_EMAIL        Yes → LOGIN-07/08 skip
  *  elevate-parent-password     ELEVATE_PARENT_PASSWORD     Yes → LOGIN-07/08 skip
- *  parent-password             PARENT_PASSWORD             Yes (not read by current tests)
- *  thinkster-qa-bypass         THINKSTER_QA_BYPASS         Yes (not read by current tests)
- *  sandbox-otp                 SANDBOX_OTP                 Yes (only used in fixme tests)
- *  sandbox-card-number         SANDBOX_CARD_NUMBER         Yes → payment tests gated off
- *                              TEST_CARD_NUMBER
- *  sandbox-card-expiry         SANDBOX_CARD_EXPIRY         Yes
- *                              TEST_CARD_EXPIRY
- *  sandbox-card-cvc            SANDBOX_CARD_CVC            Yes
- *                              TEST_CARD_CVC
  *
  * NOTE: optional:true is NOT used here because it requires Credentials Binding
- * Plugin ≥ 1.24.  Instead, all credentials must exist in Jenkins.  An empty
+ * Plugin ≥ 1.24.  Instead, both credentials must exist in Jenkins.  An empty
  * string value is functionally identical to "not set" for these tests.
  *
  * ─── DESTRUCTIVE GATES ──────────────────────────────────────────────────────
@@ -160,39 +145,11 @@ pipeline {
                 // Binding Plugin ≥ 1.24 and produces "Unknown parameter: optional"
                 // on older installations.
                 withCredentials([
-                    // ── Parent login (gates LOGIN-07 and LOGIN-08) ────────────
+                    // Gates LOGIN-07 and LOGIN-08. Blank value → tests skip.
                     string(credentialsId: 'elevate-parent-email',
                            variable: 'ELEVATE_PARENT_EMAIL'),
                     string(credentialsId: 'elevate-parent-password',
-                           variable: 'ELEVATE_PARENT_PASSWORD'),
-
-                    // ── Sandbox password alias (not read by current login tests)
-                    string(credentialsId: 'parent-password',
-                           variable: 'PARENT_PASSWORD'),
-
-                    // ── QA bypass header (sandbox environments only) ──────────
-                    string(credentialsId: 'thinkster-qa-bypass',
-                           variable: 'THINKSTER_QA_BYPASS'),
-
-                    // ── Sandbox OTP (used only in test.fixme stubs) ───────────
-                    string(credentialsId: 'sandbox-otp',
-                           variable: 'SANDBOX_OTP'),
-
-                    // ── Sandbox test card (gated behind RUN_PAYMENT=false) ────
-                    // Dual-bound: test-data.ts reads TEST_CARD_* (legacy names);
-                    // SANDBOX_CARD_* are the sandbox-aligned names for future tests.
-                    string(credentialsId: 'sandbox-card-number',
-                           variable: 'SANDBOX_CARD_NUMBER'),
-                    string(credentialsId: 'sandbox-card-number',
-                           variable: 'TEST_CARD_NUMBER'),
-                    string(credentialsId: 'sandbox-card-expiry',
-                           variable: 'SANDBOX_CARD_EXPIRY'),
-                    string(credentialsId: 'sandbox-card-expiry',
-                           variable: 'TEST_CARD_EXPIRY'),
-                    string(credentialsId: 'sandbox-card-cvc',
-                           variable: 'SANDBOX_CARD_CVC'),
-                    string(credentialsId: 'sandbox-card-cvc',
-                           variable: 'TEST_CARD_CVC')
+                           variable: 'ELEVATE_PARENT_PASSWORD')
                 ]) {
                     // npm run test:login expands to:
                     //   playwright test tests/login.spec.ts
@@ -237,14 +194,5 @@ pipeline {
             ])
         }
 
-        cleanup {
-            // Kill any Chrome processes left behind by a crashed Playwright run.
-            // Safe: the Jenkins service account has no interactive Chrome sessions.
-            // /T also terminates child processes (renderer, GPU helper).
-            // "& exit /b 0" prevents a non-zero exit code from overwriting the
-            // real build result when there is nothing to kill (taskkill exits 128
-            // when the named process is not found).
-            bat 'taskkill /F /IM chrome.exe /T 2>nul & exit /b 0'
-        }
     }
 }
